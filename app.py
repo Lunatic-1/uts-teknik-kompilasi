@@ -1,41 +1,14 @@
-"""
-==========================================================
-LABORATORIUM TEKNIK KOMPILASI
-Aplikasi GUI untuk simulasi proses kompilasi bahasa mini
-----------------------------------------------------------
-Fitur:
-  1. Lexical Analysis   – memecah kode menjadi token
-  2. Parsing             – memeriksa struktur/sintaks
-  3. Semantic Analysis   – cek variabel & tipe data
-  4. Intermediate Code   – menghasilkan Three-Address Code
-  5. Code Optimization   – optimasi sederhana
-  6. Target Code         – menghasilkan kode target (pseudo-assembly)
-
-Bahasa mini yang didukung:
-  - Tipe data  : int, float, string
-  - Operasi    : +, -, *, /, =
-  - Fungsi     : print(...)
-  - Komentar   : // satu baris
-  - Kurung     : (, ), {, }
-  - Terminator : ;
-==========================================================
-"""
-
 import re
 import tkinter as tk
 from tkinter import ttk, messagebox, scrolledtext
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import List, Optional, Tuple
-
-# ══════════════════════════════════════════════════════════
-#  DATA CLASSES
-# ══════════════════════════════════════════════════════════
 
 @dataclass
 class Token:
-    jenis: str       # tipe token (KEYWORD, IDENT, NUMBER, dsb.)
-    nilai: str       # nilai literal
-    baris: int       # nomor baris sumber
+    jenis: str
+    nilai: str
+    baris: int
 
 @dataclass
 class SymbolEntry:
@@ -45,7 +18,6 @@ class SymbolEntry:
 
 @dataclass
 class TACInstruction:
-    """Three-Address Code instruction."""
     op: str
     arg1: str = ""
     arg2: str = ""
@@ -67,30 +39,23 @@ class TACInstruction:
         else:
             return f"{self.op} {self.arg1} {self.arg2} {self.result}".strip()
 
-
-# ══════════════════════════════════════════════════════════
-#  1. LEXICAL ANALYZER  (Scanner / Tokenizer)
-# ══════════════════════════════════════════════════════════
-
 KEYWORDS = {"int", "float", "string", "print", "if", "else", "while", "for", "return"}
 
 TOKEN_PATTERN = re.compile(
-    r"(?P<COMMENT>//.*)"                         # komentar satu baris
-    r"|(?P<STRING>\"[^\"]*\")"                    # string literal
-    r"|(?P<FLOAT_NUM>\d+\.\d+)"                   # float literal
-    r"|(?P<NUMBER>\d+)"                           # integer literal
-    r"|(?P<IDENT>[A-Za-z_]\w*)"                   # identifier / keyword
-    r"|(?P<OP>[+\-*/=])"                          # operator
-    r"|(?P<RELOP>[<>!]=?|==)"                     # relational operator
-    r"|(?P<PUNCT>[();{},])"                       # tanda baca
-    r"|(?P<SKIP>[ \t]+)"                          # spasi/tab
-    r"|(?P<NEWLINE>\n)"                           # baris baru
-    r"|(?P<MISMATCH>.)"                           # karakter tak dikenal
+    r"(?P<COMMENT>//.*)"
+    r"|(?P<STRING>\"[^\"]*\")"
+    r"|(?P<FLOAT_NUM>\d+\.\d+)"
+    r"|(?P<NUMBER>\d+)"
+    r"|(?P<IDENT>[A-Za-z_]\w*)"
+    r"|(?P<OP>[+\-*/=])"
+    r"|(?P<RELOP>[<>!]=?|==)"
+    r"|(?P<PUNCT>[();{},])"
+    r"|(?P<SKIP>[ \t]+)"
+    r"|(?P<NEWLINE>\n)"
+    r"|(?P<MISMATCH>.)"
 )
 
-
 def lexical_analysis(source_code: str) -> Tuple[List[Token], List[str]]:
-    """Memecah kode sumber menjadi daftar token."""
     tokens: List[Token] = []
     errors: List[str] = []
     baris = 1
@@ -108,7 +73,6 @@ def lexical_analysis(source_code: str) -> Tuple[List[Token], List[str]]:
             errors.append(f"[Lexer] Baris {baris}: Karakter tidak dikenal '{nilai}'")
             continue
 
-        # Tentukan jenis token
         if jenis == "IDENT" and nilai in KEYWORDS:
             jenis = "KEYWORD"
         elif jenis == "FLOAT_NUM":
@@ -122,26 +86,7 @@ def lexical_analysis(source_code: str) -> Tuple[List[Token], List[str]]:
 
     return tokens, errors
 
-
-# ══════════════════════════════════════════════════════════
-#  2. PARSER  (Syntax Analysis)
-# ══════════════════════════════════════════════════════════
-
 class Parser:
-    """
-    Recursive-descent parser untuk bahasa mini.
-    Grammar (simplified):
-        program     → statement*
-        statement   → declaration | assignment | print_stmt
-        declaration → type IDENT '=' expression ';'
-        assignment  → IDENT '=' expression ';'
-        print_stmt  → 'print' '(' expression ')' ';'
-        expression  → term (('+' | '-') term)*
-        term        → factor (('*' | '/') factor)*
-        factor      → NUMBER | FLOAT | STRING | IDENT | '(' expression ')'
-        type        → 'int' | 'float' | 'string'
-    """
-
     def __init__(self, tokens: List[Token]):
         self.tokens = tokens
         self.pos = 0
@@ -175,13 +120,11 @@ class Parser:
         return self.advance()
 
     def parse(self) -> List[dict]:
-        """Parse seluruh program."""
         while self.current() is not None:
             stmt = self.parse_statement()
             if stmt:
                 self.ast.append(stmt)
             else:
-                # Skip token untuk recovery
                 if self.current():
                     self.advance()
         return self.ast
@@ -191,13 +134,10 @@ class Parser:
         if tok is None:
             return None
 
-        # Declaration: int/float/string IDENT = expr ;
         if tok.jenis == "KEYWORD" and tok.nilai in ("int", "float", "string"):
             return self.parse_declaration()
-        # Print statement: print(expr);
         elif tok.jenis == "KEYWORD" and tok.nilai == "print":
             return self.parse_print()
-        # Assignment: IDENT = expr ;
         elif tok.jenis == "IDENT":
             return self.parse_assignment()
         else:
@@ -208,7 +148,7 @@ class Parser:
             return None
 
     def parse_declaration(self) -> Optional[dict]:
-        tipe_tok = self.advance()  # int / float / string
+        tipe_tok = self.advance()
         nama_tok = self.expect("IDENT")
         if not nama_tok:
             return None
@@ -244,7 +184,7 @@ class Parser:
         }
 
     def parse_print(self) -> Optional[dict]:
-        print_tok = self.advance()  # 'print'
+        print_tok = self.advance()
         self.expect("PUNCT", "(")
         expr = self.parse_expression()
         if expr is None:
@@ -258,7 +198,6 @@ class Parser:
         }
 
     def parse_expression(self) -> Optional[dict]:
-        """expression → term (('+' | '-') term)*"""
         left = self.parse_term()
         if left is None:
             return None
@@ -279,7 +218,6 @@ class Parser:
         return left
 
     def parse_term(self) -> Optional[dict]:
-        """term → factor (('*' | '/') factor)*"""
         left = self.parse_factor()
         if left is None:
             return None
@@ -300,7 +238,6 @@ class Parser:
         return left
 
     def parse_factor(self) -> Optional[dict]:
-        """factor → NUMBER | FLOAT | STRING | IDENT | '(' expression ')'"""
         tok = self.current()
         if tok is None:
             self.errors.append("[Parser] Ekspresi tidak lengkap di akhir kode")
@@ -329,14 +266,7 @@ class Parser:
             )
             return None
 
-
-# ══════════════════════════════════════════════════════════
-#  3. SEMANTIC ANALYZER
-# ══════════════════════════════════════════════════════════
-
 class SemanticAnalyzer:
-    """Memeriksa kesesuaian variabel dan tipe data."""
-
     def __init__(self):
         self.symbol_table: dict[str, SymbolEntry] = {}
         self.errors: List[str] = []
@@ -366,7 +296,6 @@ class SemanticAnalyzer:
             )
             return
 
-        # Periksa tipe ekspresi
         expr_type = self._get_expr_type(node["value"])
         if expr_type and expr_type != dtype:
             if dtype == "float" and expr_type == "int":
@@ -451,14 +380,7 @@ class SemanticAnalyzer:
             return "int"
         return None
 
-
-# ══════════════════════════════════════════════════════════
-#  4. INTERMEDIATE CODE GENERATOR  (Three-Address Code)
-# ══════════════════════════════════════════════════════════
-
 class IntermediateCodeGenerator:
-    """Menghasilkan Three-Address Code (TAC)."""
-
     def __init__(self):
         self.instructions: List[TACInstruction] = []
         self.temp_count = 0
@@ -499,14 +421,7 @@ class IntermediateCodeGenerator:
             return temp
         return "?"
 
-
-# ══════════════════════════════════════════════════════════
-#  5. CODE OPTIMIZER
-# ══════════════════════════════════════════════════════════
-
 class CodeOptimizer:
-    """Melakukan optimasi sederhana pada Three-Address Code."""
-
     def __init__(self):
         self.log: List[str] = []
 
@@ -521,7 +436,6 @@ class CodeOptimizer:
         return optimized
 
     def _constant_folding(self, instructions: List[TACInstruction]) -> List[TACInstruction]:
-        """Menghitung ekspresi konstanta pada waktu kompilasi."""
         result = []
         for instr in instructions:
             if instr.op in ("+", "-", "*", "/"):
@@ -552,7 +466,6 @@ class CodeOptimizer:
         return result
 
     def _constant_propagation(self, instructions: List[TACInstruction]) -> List[TACInstruction]:
-        """Mengganti variabel dengan nilai konstanta jika diketahui."""
         constants = {}
         result = []
         for instr in instructions:
@@ -579,8 +492,6 @@ class CodeOptimizer:
         return result
 
     def _dead_code_elimination(self, instructions: List[TACInstruction]) -> List[TACInstruction]:
-        """Menghapus instruksi yang hasilnya tidak digunakan."""
-        # Kumpulkan semua variabel yang digunakan sebagai argumen
         used = set()
         for instr in instructions:
             if instr.op == "PRINT":
@@ -591,7 +502,6 @@ class CodeOptimizer:
                 if instr.arg2 and not self._is_literal(instr.arg2):
                     used.add(instr.arg2)
 
-        # Hapus instruksi temp yang tidak digunakan
         result = []
         for instr in instructions:
             if (instr.result.startswith("t") and instr.result not in used
@@ -602,7 +512,6 @@ class CodeOptimizer:
         return result
 
     def _strength_reduction(self, instructions: List[TACInstruction]) -> List[TACInstruction]:
-        """Mengganti operasi mahal dengan yang lebih murah (x*2 → x+x)."""
         result = []
         for instr in instructions:
             if instr.op == "*":
@@ -644,14 +553,7 @@ class CodeOptimizer:
         except ValueError:
             return s.startswith('"') and s.endswith('"')
 
-
-# ══════════════════════════════════════════════════════════
-#  6. TARGET CODE GENERATOR  (Pseudo-Assembly)
-# ══════════════════════════════════════════════════════════
-
 class TargetCodeGenerator:
-    """Menghasilkan kode target pseudo-assembly dari TAC."""
-
     def __init__(self):
         self.code: List[str] = []
 
@@ -683,14 +585,7 @@ class TargetCodeGenerator:
 
         return self.code
 
-
-# ══════════════════════════════════════════════════════════
-#  COMPILER PIPELINE  (menggabungkan semua tahap)
-# ══════════════════════════════════════════════════════════
-
 class Compiler:
-    """Menjalankan seluruh pipeline kompilasi."""
-
     def compile(self, source: str) -> dict:
         result = {
             "success": True,
@@ -707,14 +602,12 @@ class Compiler:
             "target_code": [],
         }
 
-        # ── Fase 1: Lexical Analysis ──
         tokens, lex_errors = lexical_analysis(source)
         result["tokens"] = tokens
         result["token_errors"] = lex_errors
         if lex_errors:
             result["success"] = False
 
-        # ── Fase 2: Parsing ──
         parser = Parser(tokens)
         ast = parser.parse()
         result["ast"] = ast
@@ -722,7 +615,6 @@ class Compiler:
         if parser.errors:
             result["success"] = False
 
-        # ── Fase 3: Semantic Analysis ──
         sem = SemanticAnalyzer()
         sem.analyze(ast)
         result["semantic_errors"] = sem.errors
@@ -731,31 +623,21 @@ class Compiler:
         if sem.errors:
             result["success"] = False
 
-        # Jika ada error, tetap coba generate kode (untuk demo)
-        # ── Fase 4: Intermediate Code ──
         icg = IntermediateCodeGenerator()
         icg.generate(ast)
         result["tac_before"] = list(icg.instructions)
 
-        # ── Fase 5: Optimization ──
         optimizer = CodeOptimizer()
         optimized = optimizer.optimize(icg.instructions)
         result["tac_after"] = optimized
         result["optimization_log"] = optimizer.log
 
-        # ── Fase 6: Target Code ──
         tcg = TargetCodeGenerator()
         result["target_code"] = tcg.generate(optimized)
 
         return result
 
-
-# ══════════════════════════════════════════════════════════
-#  CONTOH KODE (minimal 5 contoh)
-# ══════════════════════════════════════════════════════════
-
 CONTOH_KODE = [
-    # Contoh 1: Deklarasi dan aritmetika dasar
     (
         "Aritmetika Dasar",
         """\
@@ -764,7 +646,6 @@ int b = 20;
 int c = a + b;
 print(c);"""
     ),
-    # Contoh 2: Operasi float
     (
         "Operasi Float",
         """\
@@ -773,7 +654,6 @@ float y = 2.0;
 float z = x * y;
 print(z);"""
     ),
-    # Contoh 3: String dan multi-variabel
     (
         "String & Multi-Var",
         """\
@@ -782,7 +662,6 @@ int nilai = 100;
 print(nama);
 print(nilai);"""
     ),
-    # Contoh 4: Ekspresi kompleks
     (
         "Ekspresi Kompleks",
         """\
@@ -792,7 +671,6 @@ int c = a * 2 + b;
 int d = c - a;
 print(d);"""
     ),
-    # Contoh 5: Reassignment
     (
         "Reassignment",
         """\
@@ -803,7 +681,6 @@ y = x * 2;
 print(x);
 print(y);"""
     ),
-    # Contoh 6: Constant folding demo
     (
         "Constant Folding",
         """\
@@ -813,7 +690,6 @@ int c = 10 / 2;
 print(b);
 print(c);"""
     ),
-    # Contoh 7: Error – variabel belum dideklarasi
     (
         "Error: Var Belum Deklarasi",
         """\
@@ -821,7 +697,6 @@ int a = 10;
 b = a + 5;
 print(b);"""
     ),
-    # Contoh 8: Error – tipe data tidak cocok
     (
         "Error: Tipe Tidak Cocok",
         """\
@@ -830,15 +705,7 @@ print(x);"""
     ),
 ]
 
-
-# ══════════════════════════════════════════════════════════
-#  GUI APPLICATION
-# ══════════════════════════════════════════════════════════
-
 class App(tk.Tk):
-    """Aplikasi GUI Laboratorium Teknik Kompilasi."""
-
-    # Warna tema gelap
     BG          = "#1e1e2e"
     BG_DARK     = "#181825"
     BG_INPUT    = "#11111b"
@@ -865,10 +732,7 @@ class App(tk.Tk):
         self._build_ui()
         self._show_welcome()
 
-    # ── UI Construction ──────────────────────────────────
-
     def _build_ui(self):
-        # ─── Header ───
         header = tk.Frame(self, bg=self.BG_DARK, pady=10)
         header.pack(fill="x")
         tk.Label(
@@ -886,14 +750,12 @@ class App(tk.Tk):
             bg=self.BG_DARK,
         ).pack()
 
-        # ─── Body ───
         body = tk.PanedWindow(
             self, orient="horizontal", bg=self.BG,
             sashwidth=6, sashrelief="flat",
         )
         body.pack(fill="both", expand=True, padx=8, pady=(4, 0))
 
-        # Left panel – code editor
         left = tk.Frame(body, bg=self.BG)
         body.add(left, width=450, minsize=300)
 
@@ -910,10 +772,8 @@ class App(tk.Tk):
         )
         self.editor.pack(fill="both", expand=True)
 
-        # Line numbers (simple approach via binding)
         self.editor.bind("<KeyRelease>", self._on_editor_change)
 
-        # Right panel – results (tabs)
         right = tk.Frame(body, bg=self.BG)
         body.add(right, minsize=400)
 
@@ -921,7 +781,6 @@ class App(tk.Tk):
         self._configure_notebook_style()
         self.notebook.pack(fill="both", expand=True, pady=(4, 0))
 
-        # Create tabs
         tab_defs = [
             ("Ringkasan",       "tab_summary"),
             ("1. Token / Lexer","tab_tokens"),
@@ -942,7 +801,6 @@ class App(tk.Tk):
             self.notebook.add(frame, text=label)
             setattr(self, attr, text_widget)
 
-        # ─── Buttons ───
         btn_bar = tk.Frame(self, bg=self.BG, pady=8)
         btn_bar.pack(fill="x", padx=8)
 
@@ -961,7 +819,6 @@ class App(tk.Tk):
             )
             btn.pack(side="left", padx=(0, 10))
 
-        # ─── Status bar ───
         self.status_var = tk.StringVar(
             value="Sintaks: int/float/string, assignment (=), aritmetika (+,-,*,/), "
                   "print(), kurung, titik-koma (;)"
@@ -988,8 +845,6 @@ class App(tk.Tk):
             foreground=[("selected", self.ACCENT)],
         )
 
-    # ── Helpers ──────────────────────────────────────────
-
     def _set_tab_text(self, widget, text: str):
         widget.config(state="normal")
         widget.delete("1.0", "end")
@@ -997,7 +852,7 @@ class App(tk.Tk):
         widget.config(state="disabled")
 
     def _on_editor_change(self, event=None):
-        pass  # placeholder for future line-number highlighting
+        pass
 
     def _show_welcome(self):
         msg = (
@@ -1021,8 +876,6 @@ class App(tk.Tk):
         )
         self._set_tab_text(self.tab_summary, msg)
 
-    # ── Actions ──────────────────────────────────────────
-
     def _do_compile(self):
         source = self.editor.get("1.0", "end").strip()
         if not source:
@@ -1037,7 +890,6 @@ class App(tk.Tk):
         )
 
     def _do_contoh(self):
-        """Tampilkan menu pilihan contoh."""
         menu = tk.Menu(self, tearoff=0, font=("Segoe UI", 10),
                        bg=self.BTN_BG, fg=self.FG,
                        activebackground=self.ACCENT, activeforeground=self.BG_INPUT)
@@ -1066,10 +918,7 @@ class App(tk.Tk):
         self._show_welcome()
         self.status_var.set("Editor dan hasil dibersihkan.")
 
-    # ── Display Results ──────────────────────────────────
-
     def _display_results(self, r: dict, source: str):
-        # ── Tab 0: Ringkasan ──
         lines = []
         lines.append("╔══════════════════════════════════════════╗")
         lines.append("║       RINGKASAN HASIL KOMPILASI          ║")
@@ -1104,7 +953,6 @@ class App(tk.Tk):
                 lines.append(f"  ⚠ {e}")
             lines.append("")
 
-        # Tabel simbol
         if r["symbol_table"]:
             lines.append("── Tabel Simbol ──")
             lines.append(f"  {'Nama':<12} {'Tipe':<10}")
@@ -1115,7 +963,6 @@ class App(tk.Tk):
 
         self._set_tab_text(self.tab_summary, "\n".join(lines))
 
-        # ── Tab 1: Token / Lexer ──
         lines = []
         lines.append("╔══════════════════════════════════════════╗")
         lines.append("║       FASE 1: LEXICAL ANALYSIS           ║")
@@ -1131,7 +978,6 @@ class App(tk.Tk):
                 lines.append(f"  ✗ {e}")
         self._set_tab_text(self.tab_tokens, "\n".join(lines))
 
-        # ── Tab 2: Parser & Semantik ──
         lines = []
         lines.append("╔══════════════════════════════════════════╗")
         lines.append("║    FASE 2: PARSING (Analisis Sintaks)     ║")
@@ -1170,7 +1016,6 @@ class App(tk.Tk):
 
         self._set_tab_text(self.tab_parser, "\n".join(lines))
 
-        # ── Tab 3: Kode Antara (TAC) ──
         lines = []
         lines.append("╔══════════════════════════════════════════╗")
         lines.append("║   FASE 4: INTERMEDIATE CODE (TAC)         ║")
@@ -1181,7 +1026,6 @@ class App(tk.Tk):
         lines.append(f"\n  Total instruksi: {len(r['tac_before'])}")
         self._set_tab_text(self.tab_tac, "\n".join(lines))
 
-        # ── Tab 4: Optimasi ──
         lines = []
         lines.append("╔══════════════════════════════════════════╗")
         lines.append("║   FASE 5: CODE OPTIMIZATION               ║")
@@ -1199,7 +1043,6 @@ class App(tk.Tk):
             lines.append(f"  Pengurangan     : {diff} instruksi dihapus")
         self._set_tab_text(self.tab_opt, "\n".join(lines))
 
-        # ── Tab 5: Kode Target ──
         lines = []
         lines.append("╔══════════════════════════════════════════╗")
         lines.append("║   FASE 6: TARGET CODE (Pseudo-Assembly)    ║")
@@ -1208,11 +1051,9 @@ class App(tk.Tk):
             lines.append(f"  {line}")
         self._set_tab_text(self.tab_target, "\n".join(lines))
 
-        # Switch to summary tab
         self.notebook.select(0)
 
     def _format_ast(self, node: dict, indent: int = 0) -> List[str]:
-        """Format AST node untuk ditampilkan."""
         prefix = " " * indent
         lines = []
         ntype = node.get("type", "?")
@@ -1242,12 +1083,6 @@ class App(tk.Tk):
 
         return lines
 
-
-# ══════════════════════════════════════════════════════════
-#  ENTRY POINT
-# ══════════════════════════════════════════════════════════
-
 if __name__ == "__main__":
     app = App()
     app.mainloop()
-
